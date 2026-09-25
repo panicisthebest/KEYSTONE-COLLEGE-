@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#58c5f4"><title>Keystone College</title>
+<style>body{font-family:Arial,sans-serif;margin:0;background:#eef9ff;color:#123}header{background:#8ed8ff;padding:18px;text-align:center}main{max-width:720px;margin:auto;padding:16px}.card{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0001}input,select,textarea,button{width:100%;padding:12px;margin:7px 0;border-radius:10px;border:1px solid #b9ddec;box-sizing:border-box;font-size:15px}button{background:#58c5f4;border:0;font-weight:700;cursor:pointer}.tabs{display:flex;gap:6px}.tabs button{flex:1}.hidden{display:none}.post{border-top:1px solid #ddd;padding-top:12px;margin-top:12px}.danger{background:#ff7777}.muted{color:#667}.msg{padding:8px;background:#f1faff;border-radius:10px;margin:5px 0}.row{display:flex;gap:8px}.row>*{flex:1}img,video{max-width:100%;border-radius:12px}.notice{background:#fff8d8;border:1px solid #eadb7a;padding:10px;border-radius:10px;font-size:13px}.ok{color:#18794e}.err{color:#b42318}.small{font-size:13px}</style>
+</head><body>
+<header><h1>Keystone College</h1><div>Student Hub • Light Blue</div></header><main>
+<section id="auth"><div class="card"><h2 id="authTitle">Create account</h2>
+<div id="signupFields"><input id="name" placeholder="Full name"><input id="username" placeholder="Username"><input id="email" type="email" placeholder="Email"><select id="grade"><option value="">Choose Grade</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
+<input id="password" type="password" placeholder="Password (6+ characters)"><button onclick="submitAuth()" id="authBtn">Create account</button><button onclick="toggleAuth()" id="switchBtn">I already have an account</button>
+<p id="authMsg" class="muted"></p><div class="notice">Works in <b>Google Chrome</b> and other modern browsers. The current demo stores accounts, chats and posts on this device. To make it truly shared between students, connect the included Supabase backend settings.</div>
+</div></section>
+<section id="app" class="hidden"><div class="tabs"><button onclick="show('chat')">💬 Chats</button><button onclick="show('media')">📸 Media</button><button onclick="show('profile')">👤 Profile</button></div>
+<section id="chat" class="card"><h2>Grade Groups</h2><div class="row"><select id="chatGrade" onchange="loadChat()"></select><button onclick="loadChat()">Refresh</button></div><div id="messages"></div><div class="row"><input id="message" placeholder="Write a message"><button onclick="sendMessage()">Send</button></div></section>
+<section id="media" class="card hidden"><h2>Media</h2><textarea id="caption" placeholder="Write a caption"></textarea><input id="file" type="file" accept="image/*,video/*"><button onclick="uploadPost()">Post</button><div id="feed"></div></section>
+<section id="profile" class="card hidden"><h2>Profile</h2><div id="profileText"></div><button class="danger" onclick="logout()">Log out</button></section></section></main>
+<script>
+/* Keystone College browser-safe demo. Replace USE_DEMO with false and add Supabase config for a shared online backend. */
+const USE_DEMO=true;
+const KEY='keystone_college_v2';
+let signup=true,currentUser=null;
+function db(){return JSON.parse(localStorage.getItem(KEY)||'{"users":[],"messages":[],"posts":[],"session":null}')}function save(d){localStorage.setItem(KEY,JSON.stringify(d))}
+function toggleAuth(){signup=!signup;document.getElementById('authTitle').textContent=signup?'Create account':'Log in';document.getElementById('authBtn').textContent=signup?'Create account':'Log in';document.getElementById('switchBtn').textContent=signup?'I already have an account':'Create a new account';document.getElementById('signupFields').classList.toggle('hidden',!signup);msg('')}
+function msg(t,cls='muted'){const e=document.getElementById('authMsg');e.textContent=t;e.className=cls}
+function hash(s){let h=0;for(let i=0;i<s.length;i++)h=((h<<5)-h)+s.charCodeAt(i)|0;return String(h)}
+function submitAuth(){const d=db(),email=document.getElementById('email').value.trim().toLowerCase(),password=document.getElementById('password').value;
+if(signup){const name=document.getElementById('name').value.trim(),username=document.getElementById('username').value.trim();const grade=Number(document.getElementById('grade').value);if(!name||!username||!email||!grade||password.length<6)return msg('Please fill everything in. Password must be at least 6 characters.','err');if(d.users.some(u=>u.email===email))return msg('That email already has an account. Log in instead.','err');if(d.users.some(u=>u.username.toLowerCase()===username.toLowerCase()))return msg('That username is already taken.','err');const u={id:crypto.randomUUID(),name,username,email,grade,password:hash(password)};d.users.push(u);d.session=u.id;save(d);start();return msg('')}
+const u=d.users.find(x=>x.email===email&&x.password===hash(password));if(!u)return msg('Incorrect email or password.','err');d.session=u.id;save(d);start();}
+function start(){const d=db();currentUser=d.users.find(u=>u.id===d.session);if(!currentUser)return;document.getElementById('auth').classList.add('hidden');document.getElementById('app').classList.remove('hidden');const g=document.getElementById('chatGrade');g.innerHTML='';for(let i=7;i<=12;i++)g.innerHTML+=`<option value="${i}">Grade ${i}</option>`;g.value=currentUser.grade;loadChat();loadFeed();loadProfile()}
+function show(id){['chat','media','profile'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id));if(id==='media')loadFeed();if(id==='profile')loadProfile()}
+function loadChat(){const d=db(),grade=Number(document.getElementById('chatGrade').value),items=d.messages.filter(m=>m.grade===grade);document.getElementById('messages').innerHTML=items.map(m=>`<div class="msg"><b>${esc(m.name)}</b>: ${esc(m.body)}<div class="muted small">${new Date(m.created_at).toLocaleString()}</div></div>`).join('')||'<p class="muted">No messages yet.</p>'}
+function sendMessage(){const body=document.getElementById('message').value.trim();if(!body)return;const d=db(),grade=Number(document.getElementById('chatGrade').value);d.messages.push({id:crypto.randomUUID(),grade,body,name:currentUser.name,created_at:new Date().toISOString()});save(d);document.getElementById('message').value='';loadChat()}
+function uploadPost(){const f=document.getElementById('file').files[0],caption=document.getElementById('caption').value.trim();if(!f)return alert('Choose a photo or video.');if(f.size>8*1024*1024)return alert('For the browser demo, keep files under 8MB.');const r=new FileReader();r.onload=()=>{const d=db();d.posts.unshift({id:crypto.randomUUID(),user_id:currentUser.id,name:currentUser.name,caption,media_url:r.result,media_type:f.type.startsWith('video/')?'video':'image',created_at:new Date().toISOString()});save(d);document.getElementById('caption').value='';document.getElementById('file').value='';loadFeed()};r.readAsDataURL(f)}
+function loadFeed(){const d=db();document.getElementById('feed').innerHTML=d.posts.map(p=>`<div class="post"><b>${esc(p.name)}</b><p>${esc(p.caption||'')}</p>${p.media_type==='video'?`<video controls src="${p.media_url}"></video>`:`<img src="${p.media_url}">`}<div class="muted small">${new Date(p.created_at).toLocaleString()}</div>${p.user_id===currentUser.id?`<button class="danger" onclick="deletePost('${p.id}')">Delete</button>`:''}</div>`).join('')||'<p class="muted">No posts yet.</p>'}
+function deletePost(id){if(!confirm('Delete this post?'))return;const d=db();d.posts=d.posts.filter(p=>p.id!==id||p.user_id!==currentUser.id);save(d);loadFeed()}
+function loadProfile(){document.getElementById('profileText').innerHTML=`<p><b>Name:</b> ${esc(currentUser.name)}</p><p><b>Username:</b> @${esc(currentUser.username)}</p><p><b>Grade:</b> ${currentUser.grade}</p><p><b>Email:</b> ${esc(currentUser.email)}</p>`}
+function logout(){const d=db();d.session=null;save(d);location.reload()}
+function esc(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+(function(){const d=db();if(d.session){start()}})();
+</script></body></html>
